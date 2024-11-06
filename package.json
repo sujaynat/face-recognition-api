@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "script.js",
   "scripts": {
-    "start": "node server.js $PORT $PAT $USER_ID $APP_ID"
+    "start": "node server.js $PORT $PAT $USER_ID $APP_ID $DB_URL $DB_HOST $DB_PORT $DB_USER $DB_PASSWORD $DB_NAME"
   },
   "keywords": [],
   "author": "",
