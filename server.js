@@ -1,16 +1,15 @@
 const express = require('express');
-var cors = require('cors');
+const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const image = require('./controllers/image');
 const app = express();
 const bcrypt = require('bcrypt-nodejs');
-const { console } = require('inspector');
 const signin = require('./controllers/signin');
 const register = require('./controllers/register');
 const profile = require('./controllers/profile');
 
 app.use(cors());
-app.use(express.json()); 
+app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
@@ -20,63 +19,61 @@ const supabase = createClient(
     process.env.SUPABASE_ANON_KEY
 );
 
-// Test endpoint for Supabase connection
-app.get('/test-db', async (req, res) => {
+app.get('/', (req, res) => {
+    res.json({
+        message: 'Face Recognition API',
+        status: 'running',
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.post('/signin', async (req, res) => {
     try {
-        // Try to get the users table info
-        const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .limit(1);
-        
-        if (error) {
-            throw error;
-        }
-        
-        res.json({ 
-            success: true, 
-            message: 'Successfully connected to Supabase',
-            data: data
-        });
-    } catch (err) {
-        console.error('Database connection error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to connect to database',
-            error: err.message 
-        });
+        await signin.handleSignin(req, res, supabase, bcrypt);
+    } catch (error) {
+        console.error('Signin error:', error);
+        res.status(500).json({ error: 'Error during signin' });
     }
 });
 
-// Health check endpoint for Render
-app.get('/health', (req, res) => {
-    res.json({ status: 'healthy' });
+app.post('/register', async (req, res) => {
+    try {
+        await register.handleRegister(req, res, supabase, bcrypt);
+    } catch (error) {
+        console.error('Register error:', error);
+        res.status(500).json({ error: 'Error during registration' });
+    }
 });
 
-app.get('/', (req,res) =>{
-    res.json('Success');
-})
-
-app.post('/signin', (req, res) => { signin.handleSignin(req, res, supabase, bcrypt) })
-
-app.post('/register', (req, res) => { register.handleRegister(req, res, supabase, bcrypt) })
-
-app.get('/profile/:id', (req, res) => { profile.handleProfileGet(req, res, supabase)})
-
-app.put('/image', (req, res) => { image.handleImage(req, res, supabase)})
-
-app.post("/imageurl", async function(req, res){  
+app.get('/profile/:id', async (req, res) => {
     try {
-        var data = await image.handleApiCall(req);
-        console.log(data);
+        await profile.handleProfileGet(req, res, supabase);
+    } catch (error) {
+        console.error('Profile error:', error);
+        res.status(500).json({ error: 'Error getting profile' });
+    }
+});
+
+app.put('/image', async (req, res) => {
+    try {
+        await image.handleImage(req, res, supabase);
+    } catch (error) {
+        console.error('Image update error:', error);
+        res.status(500).json({ error: 'Error updating image count' });
+    }
+});
+
+app.post("/imageurl", async (req, res) => {  
+    try {
+        const data = await image.handleApiCall(req);
         res.json(data);
     } catch (error) {
         console.error('Error in imageurl endpoint:', error);
         res.status(500).json({ error: error.message });
     }
-})
+});
 
-app.listen(PORT, ()=>{
-    console.log(`app is running on port ${PORT}`);
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
 

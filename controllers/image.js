@@ -1,4 +1,6 @@
 const handleApiCall = async (req) => {
+    console.log('Incoming request body:', req.body);
+
     const raw = JSON.stringify({
         "user_app_id": {
             "user_id": process.env.CLARIFAI_USER_ID,
@@ -15,35 +17,53 @@ const handleApiCall = async (req) => {
         ]
     });
 
+    console.log('Request payload to Clarifai:', raw);
+    console.log('Environment variables present:', {
+        hasUserId: !!process.env.CLARIFAI_USER_ID,
+        hasAppId: !!process.env.CLARIFAI_APP_ID,
+        hasPAT: !!process.env.CLARIFAI_PAT
+    });
+
     const requestOptions = {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
-            'Authorization': 'Key ' + process.env.CLARIFAI_PAT
+            'Authorization': 'Key ' + process.env.CLARIFAI_PAT,
+            'Content-Type': 'application/json'
         },
         body: raw
     };
 
     try {
+        console.log('Sending request to Clarifai...');
         const response = await fetch(
-            "https://api.clarifai.com/v2/models/face-detection/outputs",
+            "https://api.clarifai.com/v2/models/a403429f2ddf4b49b307e318f00e528b/outputs",
             requestOptions
         );
-        const result = await response.json();
         
-        // Check if we have a valid response
-        if (result.status.code !== 10000) {
-            throw new Error('API call failed: ' + result.status.description);
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        const responseText = await response.text();
+        console.log('Raw response body:', responseText);
+        
+        let result;
+        try {
+            result = JSON.parse(responseText);
+            console.log('Parsed response:', result);
+        } catch (e) {
+            console.error('Failed to parse response as JSON:', e);
+            throw new Error('Invalid JSON response from Clarifai');
         }
 
-        // Check if we have any faces
-        if (!result.outputs?.[0]?.data?.regions) {
-            throw new Error('No faces detected in the image');
+        if (!response.ok) {
+            console.error('Clarifai error details:', result);
+            throw new Error(`Clarifai API error: ${response.status} ${response.statusText}`);
         }
 
         return result;
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error in handleApiCall:', error);
         throw error;
     }
 }
