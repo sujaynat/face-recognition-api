@@ -1,71 +1,67 @@
-const handleApiCall = async (req) => {
-    console.log('Incoming request body:', req.body);
+const clarifai = require('clarifai');
+const { response } = require('express');
+
+const baseUrl = "https://api.clarifai.com/v2/models/";
+
+const getClarifaiRequestBody = (imageUrl) =>{
+    // Your PAT (Personal Access Token) can be found in the Account's Security section
+    const PAT = process.env.CLARIFAI_PAT;
+    // Specify the correct user_id/app_id pairings
+    // Since you're making inferences outside your app's scope
+    const USER_ID = process.env.CLARIFAI_USER_ID;
+    const APP_ID = process.env.CLARIFAI_APP_ID;
+    // Change these to whatever model and image URL you want to use
+    const MODEL_ID = 'face-detection';
+    const IMAGE_URL = imageUrl;
 
     const raw = JSON.stringify({
         "user_app_id": {
-            "user_id": process.env.CLARIFAI_USER_ID,
-            "app_id": process.env.CLARIFAI_APP_ID
+            "user_id": USER_ID,
+            "app_id": APP_ID
         },
         "inputs": [
             {
                 "data": {
                     "image": {
-                        "url": req.body.input
+                        "url": IMAGE_URL
                     }
                 }
             }
         ]
     });
-
-    console.log('Request payload to Clarifai:', raw);
-    console.log('Environment variables present:', {
-        hasUserId: !!process.env.CLARIFAI_USER_ID,
-        hasAppId: !!process.env.CLARIFAI_APP_ID,
-        hasPAT: !!process.env.CLARIFAI_PAT
-    });
-
+    
     const requestOptions = {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
-            'Authorization': 'Key ' + process.env.CLARIFAI_PAT,
-            'Content-Type': 'application/json'
+            'Authorization': 'Key ' + PAT
         },
         body: raw
     };
+    return requestOptions;  
+}
 
-    try {
-        console.log('Sending request to Clarifai...');
-        const response = await fetch(
-            "https://api.clarifai.com/v2/models/a403429f2ddf4b49b307e318f00e528b/outputs",
-            requestOptions
-        );
-        
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-        
-        const responseText = await response.text();
-        console.log('Raw response body:', responseText);
-        
-        let result;
-        try {
-            result = JSON.parse(responseText);
-            console.log('Parsed response:', result);
-        } catch (e) {
-            console.error('Failed to parse response as JSON:', e);
-            throw new Error('Invalid JSON response from Clarifai');
-        }
-
-        if (!response.ok) {
-            console.error('Clarifai error details:', result);
-            throw new Error(`Clarifai API error: ${response.status} ${response.statusText}`);
-        }
-
-        return result;
-    } catch (error) {
-        console.error('Error in handleApiCall:', error);
-        throw error;
+const handleApiCall = async function (req) { 
+    if (!req.body.input) {
+        throw new Error('No URL provided');
     }
+
+    const requestOptions = getClarifaiRequestBody(req.body.input);
+    const res = await fetch(baseUrl + 'face-detection' + "/outputs", requestOptions);
+    const data = await res.json();
+
+    // Check if we have a valid response with the structure frontend expects
+    if (!data || !data.outputs || !data.outputs[0] || !data.outputs[0].data) {
+        console.error('Invalid response structure:', data);
+        throw new Error('Invalid API response structure');
+    }
+
+    // Check if we have any faces
+    if (!data.outputs[0].data.regions) {
+        throw new Error('No faces detected in the image');
+    }
+
+    return data;
 }
 
 const handleImage = async (req, res, supabase) => {
@@ -101,8 +97,8 @@ const handleImage = async (req, res, supabase) => {
 }
 
 module.exports = {
-    handleImage,
-    handleApiCall
+    handleApiCall,
+    handleImage
 }
 
 
